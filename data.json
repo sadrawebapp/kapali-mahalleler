@@ -1,0 +1,9 @@
+{
+  "İstanbul": [
+    { "ilce": "Fatih", "mahalle": "Aksaray" },
+    { "ilce": "Esenyurt", "mahalle": "Pınar" }
+  ],
+  "Ankara": [
+    { "ilce": "Çankaya", "mahalle": "Kızılay" }
+  ]
+}
