@@ -1,9 +1,110 @@
-{
-  "İstanbul": [
-    { "ilce": "Fatih", "mahalle": "Aksaray" },
-    { "ilce": "Esenyurt", "mahalle": "Pınar" }
-  ],
-  "Ankara": [
-    { "ilce": "Çankaya", "mahalle": "Kızılay" }
-  ]
+function buildJsonFromAtasa() {
+  var url = "https://atasa.tr/evaluation/closed-areas-for-foreigners";
+  var html = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true,
+    followRedirects: true,
+    headers: { "User-Agent": "Mozilla/5.0" }
+  }).getContentText("UTF-8");
+
+  // HTML -> text (NBSP dahil normalize)
+  var text = html
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|li|tr|div)>/gi, "\n")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\r/g, "\n");
+
+  // satırları temizle
+  var lines = text.split("\n").map(function(s){
+    return String(s).replace(/\s+/g, " ").trim();
+  }).filter(function(s){ return s; });
+
+  // header'ı daha esnek bul: "İl İlçe Mahalle" (NBSP/boşluk farklarına dayanıklı)
+  var start = -1;
+  for (var i=0; i<lines.length; i++){
+    if (/^İl\s+İlçe\s+Mahalle$/i.test(lines[i]) || /^Il\s+Ilce\s+Mahalle$/i.test(lines[i])) {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start === -1) throw new Error("Tablo başlığı bulunamadı: İl İlçe Mahalle");
+
+  // Türkiye 81 il listesi (doğrulama için)
+  var provinces = toSet_([
+    "Adana","Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ankara","Antalya","Ardahan","Artvin","Aydın",
+    "Balıkesir","Bartın","Batman","Bayburt","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa",
+    "Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Düzce","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir",
+    "Gaziantep","Giresun","Gümüşhane","Hakkâri","Hatay","Iğdır","Isparta","İstanbul","İzmir",
+    "Kahramanmaraş","Karabük","Karaman","Kars","Kastamonu","Kayseri","Kırıkkale","Kırklareli","Kırşehir","Kilis","Kocaeli",
+    "Konya","Kütahya","Malatya","Manisa","Mardin","Mersin","Muğla","Muş","Nevşehir","Niğde","Ordu","Osmaniye",
+    "Rize","Sakarya","Samsun","Şanlıurfa","Şırnak","Tekirdağ","Tokat","Trabzon","Tunceli","Uşak","Van","Yalova","Yozgat","Zonguldak"
+  ]);
+
+  // Çıktı: { "İstanbul | استانبول": [ {ilce, mahalle}, ... ], ... }
+  // Şimdilik Farsça karşılıkları elle ekleyeceğiz (istersen hepsini de ben eklerim)
+  var fa = {
+    "İstanbul":"استانبول","Ankara":"آنکارا","İzmir":"ازمیر","Bursa":"بورسا","Antalya":"آنتالیا","Adana":"آدانا"
+    // (hepsini istersen tek tek doldururuz)
+  };
+
+  var out = {};
+  // önce tüm illeri boş başlat (dropdown dolu olsun)
+  Object.keys(provinces).forEach(function(){});
+  // set'i array'e çeviremiyoruz; aşağıda tek tek dolduracağız:
+  var provinceArr = Object.keys(fa); // sadece örnek (istersen tüm illeri burada da tutarız)
+
+  // Tüm illeri boş init etmek için yukarıdaki 81 listeyi tekrar kullanalım:
+  var all = [
+    "Adana","Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ankara","Antalya","Ardahan","Artvin","Aydın",
+    "Balıkesir","Bartın","Batman","Bayburt","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa",
+    "Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Düzce","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir",
+    "Gaziantep","Giresun","Gümüşhane","Hakkâri","Hatay","Iğdır","Isparta","İstanbul","İzmir",
+    "Kahramanmaraş","Karabük","Karaman","Kars","Kastamonu","Kayseri","Kırıkkale","Kırklareli","Kırşehir","Kilis","Kocaeli",
+    "Konya","Kütahya","Malatya","Manisa","Mardin","Mersin","Muğla","Muş","Nevşehir","Niğde","Ordu","Osmaniye",
+    "Rize","Sakarya","Samsun","Şanlıurfa","Şırnak","Tekirdağ","Tokat","Trabzon","Tunceli","Uşak","Van","Yalova","Yozgat","Zonguldak"
+  ];
+
+  all.forEach(function(il){
+    var key = il + " | " + (fa[il] || "");
+    out[key] = [];
+  });
+
+  // satırları oku
+  for (var k=start; k<lines.length; k++){
+    var line = lines[k];
+    // SSS gibi bölüme gelince çık
+    if (/^Sıkça Sorulan/i.test(line)) break;
+
+    var parts = line.split(" ");
+    if (parts.length < 3) continue;
+
+    var il = parts[0];
+    if (!provinces[il]) continue; // il değilse geç
+
+    var ilce = parts[1];
+    var idx = 2;
+
+    // "Adıyaman Merkez ..." gibi
+    if (parts.length > 2 && parts[2] === "Merkez") {
+      ilce = parts[1] + " Merkez";
+      idx = 3;
+    }
+
+    var mahalle = parts.slice(idx).join(" ").trim();
+    if (!mahalle) continue;
+
+    var key2 = il + " | " + (fa[il] || "");
+    if (!out[key2]) out[key2] = [];
+    out[key2].push({ ilce: ilce, mahalle: mahalle });
+  }
+
+  Logger.log(JSON.stringify(out, null, 2));
+}
+
+function toSet_(arr){
+  var s = {};
+  arr.forEach(function(x){ s[x]=true; });
+  return s;
 }
