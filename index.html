@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fa">
+<head>
+  <meta charset="utf-8">
+  <title>محله‌های ممنوع برای خارجی‌ها</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body { font-family: sans-serif; background:#f7f7f7; }
+    .box { max-width:700px; margin:20px auto; background:#fff; padding:20px; border-radius:10px; }
+    select, input { width:100%; padding:10px; margin:10px 0; }
+    .item { padding:10px; border:1px solid #ddd; border-radius:8px; margin:6px 0; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>محله‌های ممنوع برای خارجی‌ها</h2>
+
+    <label>استان</label>
+    <select id="province">
+      <option value="">— انتخاب استان —</option>
+    </select>
+
+    <label>جستجو (اختیاری)</label>
+    <input id="q" placeholder="مثلاً Aksaray">
+
+    <div id="list"></div>
+  </div>
+
+<script>
+let DATA = {};
+let current = [];
+
+function norm(s){ return (s||"").toLowerCase(); }
+
+function render(arr){
+  const q = norm(document.getElementById("q").value);
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+  arr.filter(x =>
+    !q || norm(x.ilce).includes(q) || norm(x.mahalle).includes(q)
+  ).forEach(x=>{
+    const d=document.createElement("div");
+    d.className="item";
+    d.textContent = x.ilce
